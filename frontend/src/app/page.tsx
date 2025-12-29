@@ -1,6 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
 type DemoBacktest = {
   symbol: string;
@@ -12,6 +21,7 @@ type DemoBacktest = {
   alt_sma_strategy_return_pct: number;
   num_points: number;
   prices: { date: string; close: number }[];
+  equity_curve: { step: number; equity: number }[];
 };
 
 type HealthStatus = "checking" | "online" | "offline";
@@ -256,6 +266,59 @@ export default function Home() {
                 </p>
               </div>
             </section>
+
+            {/* Equity curve chart */}
+            {data.equity_curve && data.equity_curve.length > 0 && (
+              <section className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                    Equity curve (SMA {data.window}d)
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Starting equity 1.0, strategy only
+                  </p>
+                </div>
+                <div className="h-60">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={data.equity_curve}>
+                      <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                      <XAxis
+                        dataKey="step"
+                        tick={{ fontSize: 10, fill: "#cbd5f5" }}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        tick={{ fontSize: 10, fill: "#cbd5f5" }}
+                        tickLine={false}
+                        domain={["auto", "auto"]}
+                      />
+                      <Tooltip
+                        formatter={(value: any) =>
+                          typeof value === "number"
+                            ? value.toFixed(3)
+                            : value
+                        }
+                        labelFormatter={(label: any) => `Step ${label}`}
+                        contentStyle={{
+                          backgroundColor: "#020617",
+                          borderColor: "#1e293b",
+                          borderRadius: 8,
+                          fontSize: 11,
+                        }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="equity"
+                        stroke="#38bdf8"
+                        strokeWidth={2}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </section>
+            )}
 
             <section className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
               <div className="flex items-center justify-between mb-2">
