@@ -73,21 +73,31 @@ def _simple_sma_crossover(prices: List[Dict], window: int = 5) -> float:
 
 
 @router.get("/demo")
-def demo_backtest():
+def demo_backtest(
+    symbol: str = "DUMMY",
+    window: int = 5,
+    days: int = 30,
+):
     """
-    Demo backtest endpoint.
-    Returns:
-    - dummy price series
-    - buy & hold return
-    - simple SMA strategy return
+    Demo backtest endpoint with simple parameters.
+
+    Query params:
+    - symbol: string label for the asset (default: DUMMY)
+    - window: SMA window in days (default: 5)
+    - days: number of price points to generate (default: 30)
     """
-    prices = _generate_dummy_prices()
+    # basic safety guards
+    window = max(2, min(window, 100))
+    days = max(5, min(days, 365))
+
+    prices = _generate_dummy_prices(num_days=days)
     buy_hold_return = _simple_buy_and_hold(prices)
-    sma_return = _simple_sma_crossover(prices, window=5)
+    sma_return = _simple_sma_crossover(prices, window=window)
 
     return {
-        "symbol": "DUMMY",
-        "window": 5,
+        "symbol": symbol.upper(),
+        "window": window,
+        "days": days,
         "buy_and_hold_return_pct": buy_hold_return,
         "sma_strategy_return_pct": sma_return,
         "num_points": len(prices),
