@@ -40,36 +40,47 @@ def _simple_buy_and_hold(prices: List[Dict]) -> float:
     return round((end - start) / start * 100, 2)
 
 
-def _simple_sma_crossover(prices: List[Dict], window: int = 5) -> float:
+def _sma_equity_curve(prices: List[Dict], window: int = 5) -> List[Dict]:
     """
-    Very naive SMA strategy:
-    - Stay out of market until there are 'window' days
-    - If today's close > SMA(window), be 'in' (1)
-    - Else be 'out' (0)
-    - Return total % return based on position each day
+    Build an equity curve for a simple SMA crossover strategy.
+    Returns a list of {step, equity} where equity starts at 1.0.
     """
     if len(prices) <= window:
-        return 0.0
+        return []
 
     closes = [p["close"] for p in prices]
-    position = 0  # 0 = flat, 1 = long
-    equity = 1.0  # start at 1.0 and grow
+    equity = 1.0
     last_price = closes[window]
+
+    curve: List[Dict] = []
+    # starting point: no trades yet
+    curve.append({"step": window, "equity": round(equity, 4)})
 
     for i in range(window + 1, len(closes)):
         window_closes = closes[i - window : i]
         sma = sum(window_closes) / window
         price = closes[i]
 
-        # Decide position for today
         position = 1 if price > sma else 0
 
-        # Apply daily return
         daily_return = (price - last_price) / last_price if last_price > 0 else 0.0
         equity *= 1 + position * daily_return
         last_price = price
 
-    return round((equity - 1.0) * 100, 2)
+        curve.append({"step": i, "equity": round(equity, 4)})
+
+    return curve
+
+
+def _simple_sma_crossover(prices: List[Dict], window: int = 5) -> float:
+    """
+    Simple SMA crossover total return %, derived from the equity curve.
+    """
+    curve = _sma_equity_curve(prices, window=window)
+    if not curve:
+        return 0.0
+    end_equity = curve[-1]["equity"]
+    return round((end_equity - 1.0) * 100, 2)
 
 
 @router.get("/demo")
@@ -98,6 +109,8 @@ def demo_backtest(
     sma_return = _simple_sma_crossover(prices, window=window)
     alt_sma_return = _simple_sma_crossover(prices, window=alt_window)
 
+    equity_curve = _sma_equity_curve(prices, window=window)
+
     return {
         "symbol": symbol.upper(),
         "window": window,
@@ -108,4 +121,5 @@ def demo_backtest(
         "alt_sma_strategy_return_pct": alt_sma_return,
         "num_points": len(prices),
         "prices": prices,
+        "equity_curve": equity_curve,
     }
