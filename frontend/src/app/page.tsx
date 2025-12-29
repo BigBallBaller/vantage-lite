@@ -5,9 +5,11 @@ import { useEffect, useState } from "react";
 type DemoBacktest = {
   symbol: string;
   window: number;
+  alt_window: number;
   days: number;
   buy_and_hold_return_pct: number;
   sma_strategy_return_pct: number;
+  alt_sma_strategy_return_pct: number;
   num_points: number;
   prices: { date: string; close: number }[];
 };
@@ -17,6 +19,7 @@ type HealthStatus = "checking" | "online" | "offline";
 export default function Home() {
   const [symbol, setSymbol] = useState("DUMMY");
   const [window, setWindow] = useState(5);
+  const [altWindow, setAltWindow] = useState(10);
   const [days, setDays] = useState(30);
 
   const [data, setData] = useState<DemoBacktest | null>(null);
@@ -41,15 +44,18 @@ export default function Home() {
   async function fetchBacktest(params?: {
     symbol?: string;
     window?: number;
+    altWindow?: number;
     days?: number;
   }) {
     const s = params?.symbol ?? symbol;
     const w = params?.window ?? window;
+    const aw = params?.altWindow ?? altWindow;
     const d = params?.days ?? days;
 
     const query = new URLSearchParams({
       symbol: s,
       window: String(w),
+      alt_window: String(aw),
       days: String(d),
     });
 
@@ -119,7 +125,7 @@ export default function Home() {
               <p className="text-sm text-slate-300">
                 Demo backtest powered by your FastAPI backend. Adjust the symbol
                 and parameters below and run a new backtest using a dummy price
-                series and a simple SMA crossover strategy.
+                series and simple SMA crossover strategies.
               </p>
             </div>
             {renderHealthBadge()}
@@ -132,7 +138,7 @@ export default function Home() {
             onSubmit={handleSubmit}
             className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between"
           >
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-3">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-300">
                   Symbol
@@ -154,6 +160,19 @@ export default function Home() {
                   max={100}
                   value={window}
                   onChange={(e) => setWindow(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-300">
+                  Alt SMA window (days)
+                </label>
+                <input
+                  type="number"
+                  min={2}
+                  max={100}
+                  value={altWindow}
+                  onChange={(e) => setAltWindow(Number(e.target.value))}
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
                 />
               </div>
@@ -200,7 +219,7 @@ export default function Home() {
                   {data.symbol}
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
-                  Window: {data.window} day SMA
+                  Days: {data.days}, points: {data.num_points}
                 </p>
               </div>
 
@@ -218,13 +237,22 @@ export default function Home() {
 
               <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-                  SMA strategy return
+                  SMA strategies
                 </p>
-                <p className="text-2xl font-semibold text-emerald-300">
-                  {data.sma_strategy_return_pct}%
+                <p className="text-sm text-slate-200">
+                  SMA {data.window}d:{" "}
+                  <span className="font-semibold text-emerald-300">
+                    {data.sma_strategy_return_pct}%
+                  </span>
+                </p>
+                <p className="text-sm text-slate-200">
+                  SMA {data.alt_window}d:{" "}
+                  <span className="font-semibold text-emerald-200">
+                    {data.alt_sma_strategy_return_pct}%
+                  </span>
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
-                  Using {data.window}-day SMA crossover
+                  Both based on simple crossover logic.
                 </p>
               </div>
             </section>

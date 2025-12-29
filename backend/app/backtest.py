@@ -76,6 +76,7 @@ def _simple_sma_crossover(prices: List[Dict], window: int = 5) -> float:
 def demo_backtest(
     symbol: str = "DUMMY",
     window: int = 5,
+    alt_window: int = 10,
     days: int = 30,
 ):
     """
@@ -83,23 +84,28 @@ def demo_backtest(
 
     Query params:
     - symbol: string label for the asset (default: DUMMY)
-    - window: SMA window in days (default: 5)
+    - window: primary SMA window in days (default: 5)
+    - alt_window: secondary SMA window in days (default: 10)
     - days: number of price points to generate (default: 30)
     """
     # basic safety guards
     window = max(2, min(window, 100))
+    alt_window = max(2, min(alt_window, 100))
     days = max(5, min(days, 365))
 
     prices = _generate_dummy_prices(num_days=days)
     buy_hold_return = _simple_buy_and_hold(prices)
     sma_return = _simple_sma_crossover(prices, window=window)
+    alt_sma_return = _simple_sma_crossover(prices, window=alt_window)
 
     return {
         "symbol": symbol.upper(),
         "window": window,
+        "alt_window": alt_window,
         "days": days,
         "buy_and_hold_return_pct": buy_hold_return,
         "sma_strategy_return_pct": sma_return,
+        "alt_sma_strategy_return_pct": alt_sma_return,
         "num_points": len(prices),
         "prices": prices,
     }
