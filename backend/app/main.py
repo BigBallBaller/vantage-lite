@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.backtest import router as backtest_router
+
 app = FastAPI()
 
 # Allow requests from your Next.js dev server
@@ -23,5 +25,9 @@ def read_root():
     return {
         "message": "Vantage Lite backend is live",
         "status": "ok",
-        "source": "FastAPI"
+        "source": "FastAPI",
     }
+
+
+# All backtest-related endpoints will live under /backtest
+app.include_router(backtest_router, prefix="/backtest", tags=["backtest"])
