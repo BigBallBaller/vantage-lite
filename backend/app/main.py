@@ -29,5 +29,17 @@ def read_root():
     }
 
 
+@app.get("/health")
+def health():
+    """
+    Simple health check endpoint for the backend.
+    """
+    return {
+        "status": "ok",
+        "service": "vantage-lite-backend",
+        "version": "0.1.0",
+    }
+
+
 # All backtest-related endpoints will live under /backtest
 app.include_router(backtest_router, prefix="/backtest", tags=["backtest"])

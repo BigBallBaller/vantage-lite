@@ -12,6 +12,8 @@ type DemoBacktest = {
   prices: { date: string; close: number }[];
 };
 
+type HealthStatus = "checking" | "online" | "offline";
+
 export default function Home() {
   const [symbol, setSymbol] = useState("DUMMY");
   const [window, setWindow] = useState(5);
@@ -20,6 +22,21 @@ export default function Home() {
   const [data, setData] = useState<DemoBacktest | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [health, setHealth] = useState<HealthStatus>("checking");
+
+  async function checkHealth() {
+    try {
+      const res = await fetch("http://localhost:8000/health");
+      if (res.ok) {
+        setHealth("online");
+      } else {
+        setHealth("offline");
+      }
+    } catch {
+      setHealth("offline");
+    }
+  }
 
   async function fetchBacktest(params?: {
     symbol?: string;
@@ -58,8 +75,9 @@ export default function Home() {
     }
   }
 
-  // Load default on first render
+  // On first render: check backend health and load default backtest
   useEffect(() => {
+    checkHealth();
     fetchBacktest();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -69,18 +87,43 @@ export default function Home() {
     fetchBacktest();
   }
 
+  function renderHealthBadge() {
+    let text = "Checking…";
+    let circleClass = "bg-yellow-400";
+
+    if (health === "online") {
+      text = "Backend: Online";
+      circleClass = "bg-emerald-400";
+    } else if (health === "offline") {
+      text = "Backend: Offline";
+      circleClass = "bg-red-400";
+    }
+
+    return (
+      <div className="inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900 px-3 py-1 text-[11px] text-slate-300">
+        <span className={`h-2 w-2 rounded-full ${circleClass}`} />
+        <span>{text}</span>
+      </div>
+    );
+  }
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-4">
       <div className="w-full max-w-4xl space-y-6">
-        <header className="space-y-1">
-          <h1 className="text-3xl font-semibold text-sky-400">
-            Vantage Lite
-          </h1>
-          <p className="text-sm text-slate-300">
-            Demo backtest powered by your FastAPI backend. Adjust the symbol and
-            parameters below and run a new backtest using a dummy price series
-            and a simple SMA crossover strategy.
-          </p>
+        <header className="space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <h1 className="text-3xl font-semibold text-sky-400">
+                Vantage Lite
+              </h1>
+              <p className="text-sm text-slate-300">
+                Demo backtest powered by your FastAPI backend. Adjust the symbol
+                and parameters below and run a new backtest using a dummy price
+                series and a simple SMA crossover strategy.
+              </p>
+            </div>
+            {renderHealthBadge()}
+          </div>
         </header>
 
         {/* Form */}
@@ -239,6 +282,10 @@ export default function Home() {
           Backend:{" "}
           <code className="bg-slate-900 px-1 py-0.5 rounded border border-slate-800">
             http://localhost:8000/backtest/demo
+          </code>{" "}
+          · Health:{" "}
+          <code className="bg-slate-900 px-1 py-0.5 rounded border border-slate-800">
+            http://localhost:8000/health
           </code>{" "}
           · Frontend: Next.js client component fetching on the client.
         </footer>
