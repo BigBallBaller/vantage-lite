@@ -26,6 +26,16 @@ type DemoBacktest = {
 
 type HealthStatus = "checking" | "online" | "offline";
 
+// Frontend validation limits (match or tighten backend guards)
+const MIN_WINDOW = 1;
+const MAX_WINDOW = 100;
+const MIN_DAYS = 5;
+const MAX_DAYS = 365;
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 export default function Home() {
   const [symbol, setSymbol] = useState("DUMMY");
   const [window, setWindow] = useState(5);
@@ -57,10 +67,22 @@ export default function Home() {
     altWindow?: number;
     days?: number;
   }) {
-    const s = params?.symbol ?? symbol;
-    const w = params?.window ?? window;
-    const aw = params?.altWindow ?? altWindow;
-    const d = params?.days ?? days;
+    const rawSymbol = params?.symbol ?? symbol;
+    const s = rawSymbol.trim() === "" ? "DUMMY" : rawSymbol.trim().toUpperCase();
+
+    const rawWindow = params?.window ?? window;
+    const rawAltWindow = params?.altWindow ?? altWindow;
+    const rawDays = params?.days ?? days;
+
+    const w = clamp(rawWindow, MIN_WINDOW, MAX_WINDOW);
+    const aw = clamp(rawAltWindow, MIN_WINDOW, MAX_WINDOW);
+    const d = clamp(rawDays, MIN_DAYS, MAX_DAYS);
+
+    // keep local state in sync with clamped values
+    setWindow(w);
+    setAltWindow(aw);
+    setDays(d);
+    setSymbol(s);
 
     const query = new URLSearchParams({
       symbol: s,
@@ -155,10 +177,15 @@ export default function Home() {
                 </label>
                 <input
                   value={symbol}
-                  onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                  onChange={(e) =>
+                    setSymbol(e.target.value.toUpperCase().slice(0, 10))
+                  }
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
                   placeholder="AAPL, SPY, etc."
                 />
+                <p className="text-[11px] text-slate-500">
+                  Leave blank to use DUMMY.
+                </p>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-300">
@@ -166,12 +193,19 @@ export default function Home() {
                 </label>
                 <input
                   type="number"
-                  min={2}
-                  max={100}
+                  min={MIN_WINDOW}
+                  max={MAX_WINDOW}
                   value={window}
-                  onChange={(e) => setWindow(Number(e.target.value))}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    if (Number.isNaN(value)) return;
+                    setWindow(clamp(value, MIN_WINDOW, MAX_WINDOW));
+                  }}
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
                 />
+                <p className="text-[11px] text-slate-500">
+                  {MIN_WINDOW}–{MAX_WINDOW} days.
+                </p>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-300">
@@ -179,12 +213,19 @@ export default function Home() {
                 </label>
                 <input
                   type="number"
-                  min={2}
-                  max={100}
+                  min={MIN_WINDOW}
+                  max={MAX_WINDOW}
                   value={altWindow}
-                  onChange={(e) => setAltWindow(Number(e.target.value))}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    if (Number.isNaN(value)) return;
+                    setAltWindow(clamp(value, MIN_WINDOW, MAX_WINDOW));
+                  }}
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
                 />
+                <p className="text-[11px] text-slate-500">
+                  {MIN_WINDOW}–{MAX_WINDOW} days.
+                </p>
               </div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-300">
@@ -192,12 +233,19 @@ export default function Home() {
                 </label>
                 <input
                   type="number"
-                  min={5}
-                  max={365}
+                  min={MIN_DAYS}
+                  max={MAX_DAYS}
                   value={days}
-                  onChange={(e) => setDays(Number(e.target.value))}
+                  onChange={(e) => {
+                    const value = Number(e.target.value);
+                    if (Number.isNaN(value)) return;
+                    setDays(clamp(value, MIN_DAYS, MAX_DAYS));
+                  }}
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
                 />
+                <p className="text-[11px] text-slate-500">
+                  {MIN_DAYS}–{MAX_DAYS} days.
+                </p>
               </div>
             </div>
 
@@ -251,15 +299,15 @@ export default function Home() {
                 </p>
                 <p className="text-sm text-slate-200">
                   SMA {data.window}d:{" "}
-                  <span className="font-semibold text-emerald-300">
-                    {data.sma_strategy_return_pct}%
-                  </span>
+                    <span className="font-semibold text-emerald-300">
+                      {data.sma_strategy_return_pct}%
+                    </span>
                 </p>
                 <p className="text-sm text-slate-200">
                   SMA {data.alt_window}d:{" "}
-                  <span className="font-semibold text-emerald-200">
-                    {data.alt_sma_strategy_return_pct}%
-                  </span>
+                    <span className="font-semibold text-emerald-200">
+                      {data.alt_sma_strategy_return_pct}%
+                    </span>
                 </p>
                 <p className="text-xs text-slate-400 mt-1">
                   Both based on simple crossover logic.

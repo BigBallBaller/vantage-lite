@@ -100,8 +100,8 @@ def demo_backtest(
     - days: number of price points to generate (default: 30)
     """
     # basic safety guards
-    window = max(2, min(window, 100))
-    alt_window = max(2, min(alt_window, 100))
+    window = max(1, min(window, 100))
+    alt_window = max(1, min(alt_window, 100))
     days = max(5, min(days, 365))
 
     prices = _generate_dummy_prices(num_days=days)
