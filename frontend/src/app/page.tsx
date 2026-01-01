@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import { api } from "./config";
 
 type DemoBacktest = {
   symbol: string;
@@ -98,7 +99,7 @@ export default function Home() {
 
   async function checkHealth() {
     try {
-      const res = await fetch("http://localhost:8000/health");
+      const res = await fetch(api.health);
       if (res.ok) {
         setHealth("online");
       } else {
@@ -144,9 +145,7 @@ export default function Home() {
       setLoading(true);
       setError(null);
 
-      const res = await fetch(
-        `http://localhost:8000/backtest/demo?${query.toString()}`
-      );
+      const res = await fetch(`${api.backtestDemo}?${query.toString()}`);
 
       if (!res.ok) {
         throw new Error(`Backend returned ${res.status}`);
@@ -181,8 +180,7 @@ export default function Home() {
         rawMessage.includes("Failed to fetch") ||
         rawMessage.includes("NetworkError")
       ) {
-        message =
-          "Could not reach backend at http://localhost:8000. Please make sure it is running.";
+        message = `Could not reach backend at ${api.baseUrl}. Please make sure it is running.`;
       } else if (rawMessage) {
         message = rawMessage;
       }
@@ -810,11 +808,11 @@ export default function Home() {
         <footer className="text-[11px] text-slate-500">
           Backend:{" "}
           <code className="bg-slate-900 px-1 py-0.5 rounded border border-slate-800">
-            http://localhost:8000/backtest/demo
+            {api.backtestDemo}
           </code>{" "}
           · Health:{" "}
           <code className="bg-slate-900 px-1 py-0.5 rounded border border-slate-800">
-            http://localhost:8000/health
+            {api.health}
           </code>{" "}
           · Frontend: Next.js client component fetching on the client.
         </footer>
