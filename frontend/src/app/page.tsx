@@ -68,7 +68,8 @@ export default function Home() {
     days?: number;
   }) {
     const rawSymbol = params?.symbol ?? symbol;
-    const s = rawSymbol.trim() === "" ? "DUMMY" : rawSymbol.trim().toUpperCase();
+    const s =
+      rawSymbol.trim() === "" ? "DUMMY" : rawSymbol.trim().toUpperCase();
 
     const rawWindow = params?.window ?? window;
     const rawAltWindow = params?.altWindow ?? altWindow;
@@ -106,7 +107,20 @@ export default function Home() {
       const json = (await res.json()) as DemoBacktest;
       setData(json);
     } catch (err: any) {
-      setError(err.message ?? "Unknown error");
+      let message = "Unknown error";
+
+      const rawMessage = err?.message ?? "";
+      if (
+        rawMessage.includes("Failed to fetch") ||
+        rawMessage.includes("NetworkError")
+      ) {
+        message =
+          "Could not reach backend at http://localhost:8000. The API server is currently offline.";
+      } else if (rawMessage) {
+        message = rawMessage;
+      }
+
+      setError(message);
       setData(null);
     } finally {
       setLoading(false);
@@ -252,10 +266,20 @@ export default function Home() {
             <button
               type="submit"
               className="mt-1 inline-flex items-center justify-center rounded-lg bg-sky-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-sky-400 disabled:opacity-60 disabled:cursor-not-allowed"
-              disabled={loading}
+              disabled={loading || health === "offline"}
             >
               {loading ? "Running…" : "Run demo backtest"}
             </button>
+
+            {health === "offline" && (
+              <p className="mt-1 text-[11px] text-amber-400">
+                Backend appears offline. Start it with{" "}
+                <code className="bg-slate-950 px-1 py-0.5 rounded border border-slate-800">
+                  uvicorn app.main:app --reload
+                </code>{" "}
+                in the <code>backend</code> folder.
+              </p>
+            )}
           </form>
 
           {error && (
@@ -268,53 +292,6 @@ export default function Home() {
         {/* Results */}
         {data && (
           <>
-            <section className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
-                <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-                  Symbol
-                </p>
-                <p className="text-lg font-semibold text-sky-300">
-                  {data.symbol}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Days: {data.days}, points: {data.num_points}
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
-                <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-                  Buy &amp; hold return
-                </p>
-                <p className="text-2xl font-semibold text-emerald-400">
-                  {data.buy_and_hold_return_pct}%
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  From first close to last close
-                </p>
-              </div>
-
-              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
-                <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-                  SMA strategies
-                </p>
-                <p className="text-sm text-slate-200">
-                  SMA {data.window}d:{" "}
-                    <span className="font-semibold text-emerald-300">
-                      {data.sma_strategy_return_pct}%
-                    </span>
-                </p>
-                <p className="text-sm text-slate-200">
-                  SMA {data.alt_window}d:{" "}
-                    <span className="font-semibold text-emerald-200">
-                      {data.alt_sma_strategy_return_pct}%
-                    </span>
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Both based on simple crossover logic.
-                </p>
-              </div>
-            </section>
-
             {/* Equity curve chart */}
             {data.equity_curve && data.equity_curve.length > 0 && (
               <section className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
@@ -368,6 +345,7 @@ export default function Home() {
               </section>
             )}
 
+            {/* Price series table */}
             <section className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs uppercase tracking-wide text-slate-400">
