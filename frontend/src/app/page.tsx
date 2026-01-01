@@ -27,6 +27,19 @@ type DemoBacktest = {
   sharpe_like: number;
 };
 
+type BacktestSummary = {
+  id: number;          // unique per run
+  timestamp: string;   // ISO string
+  symbol: string;
+  window: number;
+  altWindow: number;
+  days: number;
+  buyHold: number;
+  sma: number;
+  altSma: number;
+  sharpeLike: number;
+};
+
 type HealthStatus = "checking" | "online" | "offline";
 
 type CustomPreset = {
@@ -80,6 +93,8 @@ export default function Home() {
   const [presetError, setPresetError] = useState<string | null>(null);
 
   const best = data ? getBestPerformer(data) : null;
+
+  const [history, setHistory] = useState<BacktestSummary[]>([]);
 
   async function checkHealth() {
     try {
@@ -139,6 +154,25 @@ export default function Home() {
 
       const json = (await res.json()) as DemoBacktest;
       setData(json);
+
+      // Record a short summary of this run in local history (up to 5 entries)
+      const summary: BacktestSummary = {
+        id: Date.now(),
+        timestamp: new Date().toISOString(),
+        symbol: json.symbol,
+        window: json.window,
+        altWindow: json.alt_window,
+        days: json.days,
+        buyHold: json.buy_and_hold_return_pct,
+        sma: json.sma_strategy_return_pct,
+        altSma: json.alt_sma_strategy_return_pct,
+        sharpeLike: json.sharpe_like,
+      };
+
+      setHistory((prev) => {
+        const next = [summary, ...prev];
+        return next.slice(0, 5); // keep only last 5 runs
+      });
     } catch (err: any) {
       let message = "Unknown error";
 
@@ -630,6 +664,95 @@ export default function Home() {
                       />
                     </LineChart>
                   </ResponsiveContainer>
+                </div>
+              </section>
+            )}
+
+              {/* Recent backtests (local history) */}
+              {history.length > 0 && (
+              <section className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs uppercase tracking-wide text-slate-400">
+                    Recent backtests
+                  </p>
+                  <p className="text-xs text-slate-400">
+                    Showing last {history.length} run
+                    {history.length > 1 ? "s" : ""}.
+                  </p>
+                </div>
+
+                <div className="max-h-40 overflow-auto rounded-lg border border-slate-800 bg-slate-950">
+                  <table className="w-full text-xs">
+                    <thead className="bg-slate-900 sticky top-0">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-semibold text-slate-300">
+                          Time
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold text-slate-300">
+                          Symbol
+                        </th>
+                        <th className="px-3 py-2 text-left font-semibold text-slate-300">
+                          Windows
+                        </th>
+                        <th className="px-3 py-2 text-right font-semibold text-slate-300">
+                          Days
+                        </th>
+                        <th className="px-3 py-2 text-right font-semibold text-slate-300">
+                          Buy &amp; hold
+                        </th>
+                        <th className="px-3 py-2 text-right font-semibold text-slate-300">
+                          SMA
+                        </th>
+                        <th className="px-3 py-2 text-right font-semibold text-slate-300">
+                          Alt SMA
+                        </th>
+                        <th className="px-3 py-2 text-right font-semibold text-slate-300">
+                          Sharpe-like
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map((run, index) => (
+                        <tr
+                          key={run.id}
+                          className={
+                            "border-t border-slate-800 hover:bg-slate-900/70 " +
+                            (index === 0 ? "bg-slate-900/60" : "")
+                          }
+                        >
+                          <td className="px-3 py-1.5 text-slate-200">
+                            {new Date(run.timestamp).toLocaleTimeString()}
+                            {index === 0 && (
+                              <span className="ml-1 text-[10px] text-emerald-300">
+                                (latest)
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-3 py-1.5 text-slate-200">
+                            {run.symbol}
+                          </td>
+                          <td className="px-3 py-1.5 text-slate-200">
+                            {run.window}d / {run.altWindow}d
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-slate-200">
+                            {run.days}
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-slate-200">
+                            {run.buyHold.toFixed(2)}%
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-slate-200">
+                            {run.sma.toFixed(2)}%
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-slate-200">
+                            {run.altSma.toFixed(2)}%
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-slate-200">
+                            {run.sharpeLike.toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </section>
             )}
