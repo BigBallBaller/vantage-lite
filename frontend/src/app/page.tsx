@@ -36,6 +36,18 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
+function getBestPerformer(data: DemoBacktest) {
+  const candidates = [
+    { label: "Buy & hold", value: data.buy_and_hold_return_pct },
+    { label: `SMA ${data.window}d`, value: data.sma_strategy_return_pct },
+    { label: `SMA ${data.alt_window}d`, value: data.alt_sma_strategy_return_pct },
+  ];
+
+  return candidates.reduce((best, current) =>
+    current.value > best.value ? current : best
+  );
+}
+
 export default function Home() {
   const [symbol, setSymbol] = useState("DUMMY");
   const [window, setWindow] = useState(5);
@@ -47,6 +59,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   const [health, setHealth] = useState<HealthStatus>("checking");
+
+  const best = data ? getBestPerformer(data) : null;
 
   async function checkHealth() {
     try {
@@ -68,8 +82,7 @@ export default function Home() {
     days?: number;
   }) {
     const rawSymbol = params?.symbol ?? symbol;
-    const s =
-      rawSymbol.trim() === "" ? "DUMMY" : rawSymbol.trim().toUpperCase();
+    const s = rawSymbol.trim() === "" ? "DUMMY" : rawSymbol.trim().toUpperCase();
 
     const rawWindow = params?.window ?? window;
     const rawAltWindow = params?.altWindow ?? altWindow;
@@ -115,7 +128,7 @@ export default function Home() {
         rawMessage.includes("NetworkError")
       ) {
         message =
-          "Backend is currently offline (http://localhost:8000).";
+          "Could not reach backend at http://localhost:8000. Please make sure it is running.";
       } else if (rawMessage) {
         message = rawMessage;
       }
@@ -137,27 +150,6 @@ export default function Home() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     fetchBacktest();
-  }
-
-  // New: quick preset runners
-  function handlePreset(presetSymbol: string) {
-    const s = presetSymbol.toUpperCase();
-    setSymbol(s);
-    fetchBacktest({ symbol: s });
-  }
-
-  // New: reset to defaults
-  function handleReset() {
-    const s = "DUMMY";
-    const w = 5;
-    const aw = 10;
-    const d = 30;
-
-    setSymbol(s);
-    setWindow(w);
-    setAltWindow(aw);
-    setDays(d);
-    fetchBacktest({ symbol: s, window: w, altWindow: aw, days: d });
   }
 
   function renderHealthBadge() {
@@ -239,7 +231,7 @@ export default function Home() {
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
                 />
                 <p className="text-[11px] text-slate-500">
-                  {MIN_WINDOW}–{MAX_WINDOW} days.
+                  {MIN_WINDOW}-{MAX_WINDOW} days.
                 </p>
               </div>
               <div className="space-y-1">
@@ -259,7 +251,7 @@ export default function Home() {
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
                 />
                 <p className="text-[11px] text-slate-500">
-                  {MIN_WINDOW}–{MAX_WINDOW} days.
+                  {MIN_WINDOW}-{MAX_WINDOW} days.
                 </p>
               </div>
               <div className="space-y-1">
@@ -279,34 +271,8 @@ export default function Home() {
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
                 />
                 <p className="text-[11px] text-slate-500">
-                  {MIN_DAYS}–{MAX_DAYS} days.
+                  {MIN_DAYS}-{MAX_DAYS} days.
                 </p>
-              </div>
-
-              {/* New: presets row spanning all columns */}
-              <div className="space-y-1 sm:col-span-4">
-                <p className="text-[11px] text-slate-500">Quick presets</p>
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {["AAPL", "SPY", "QQQ"].map((sym) => (
-                    <button
-                      key={sym}
-                      type="button"
-                      onClick={() => handlePreset(sym)}
-                      className="rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-100 hover:bg-slate-800"
-                      disabled={loading || health === "offline"}
-                    >
-                      {sym}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={handleReset}
-                    className="rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800"
-                    disabled={loading || health === "offline"}
-                  >
-                    Reset
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -317,17 +283,21 @@ export default function Home() {
             >
               {loading ? "Running…" : "Run demo backtest"}
             </button>
-
-            {health === "offline" && (
-              <p className="mt-1 text-[11px] text-amber-400">
-                Backend appears offline. Start it with{" "}
-                <code className="bg-slate-950 px-1 py-0.5 rounded border border-slate-800">
-                  uvicorn app.main:app --reload
-                </code>{" "}
-                in the <code>backend</code> folder.
-              </p>
-            )}
           </form>
+
+          {health === "offline" && (
+            <p className="mt-1 text-[11px] text-amber-400">
+              Backend appears offline. Start it in the{" "}
+              <code className="bg-slate-950 px-1 py-0.5 rounded border border-slate-800">
+                backend
+              </code>{" "}
+              folder with{" "}
+              <code className="bg-slate-950 px-1 py-0.5 rounded border border-slate-800">
+                uvicorn app.main:app --reload
+              </code>
+              .
+            </p>
+          )}
 
           {error && (
             <p className="mt-2 text-xs text-red-400">
@@ -339,7 +309,6 @@ export default function Home() {
         {/* Results */}
         {data && (
           <>
-            {/* Summary cards */}
             <section className="grid gap-4 sm:grid-cols-3">
               <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
@@ -355,7 +324,7 @@ export default function Home() {
 
               <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
                 <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-                  Buy &amp; hold return
+                  Buy and hold return
                 </p>
                 <p className="text-2xl font-semibold text-emerald-400">
                   {data.buy_and_hold_return_pct}%
@@ -381,34 +350,19 @@ export default function Home() {
                     {data.alt_sma_strategy_return_pct}%
                   </span>
                 </p>
-                {/* New: best performer label */}
-                {(() => {
-                  const entries = [
-                    {
-                      label: "Buy & hold",
-                      pct: data.buy_and_hold_return_pct,
-                    },
-                    {
-                      label: `SMA ${data.window}d`,
-                      pct: data.sma_strategy_return_pct,
-                    },
-                    {
-                      label: `SMA ${data.alt_window}d`,
-                      pct: data.alt_sma_strategy_return_pct,
-                    },
-                  ];
-                  const best = entries.reduce((a, b) =>
-                    b.pct > a.pct ? b : a
-                  );
-                  return (
-                    <p className="text-xs text-slate-400 mt-1">
-                      Best performer:{" "}
-                      <span className="font-semibold text-emerald-300">
-                        {best.label} ({best.pct}%)
-                      </span>
-                    </p>
-                  );
-                })()}
+
+                {best && (
+                  <p className="text-xs text-slate-300 mt-1">
+                    Best performer:{" "}
+                    <span className="font-semibold text-emerald-300">
+                      {best.label} ({best.value}%)
+                    </span>
+                  </p>
+                )}
+
+                <p className="text-xs text-slate-400 mt-1">
+                  Both based on simple crossover logic.
+                </p>
               </div>
             </section>
 
@@ -465,9 +419,8 @@ export default function Home() {
               </section>
             )}
 
-            {/* Price series table */}
             <section className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
-              <div className="flex items-center justify_between mb-2">
+              <div className="flex items-center justify-between mb-2">
                 <p className="text-xs uppercase tracking-wide text-slate-400">
                   Price series
                 </p>
