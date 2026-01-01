@@ -13,7 +13,7 @@ import {
 
 type DemoBacktest = {
   symbol: string;
-  window: number; // backend SMA window
+  window: number;
   alt_window: number;
   days: number;
   buy_and_hold_return_pct: number;
@@ -22,6 +22,9 @@ type DemoBacktest = {
   num_points: number;
   prices: { date: string; close: number }[];
   equity_curve: { step: number; equity: number }[];
+  max_drawdown_pct: number;
+  volatility_pct: number;
+  sharpe_like: number;
 };
 
 type HealthStatus = "checking" | "online" | "offline";
@@ -493,62 +496,90 @@ export default function Home() {
         {/* Results */}
         {data && (
           <>
-            <section className="grid gap-4 sm:grid-cols-3">
-              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
-                <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-                  Symbol
-                </p>
-                <p className="text-lg font-semibold text-sky-300">
-                  {data.symbol}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  Days: {data.days}, points: {data.num_points}
-                </p>
-              </div>
+            <section className="grid gap-4 sm:grid-cols-4">
+  <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+    <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
+      Symbol
+    </p>
+    <p className="text-lg font-semibold text-sky-300">
+      {data.symbol}
+    </p>
+    <p className="text-xs text-slate-400 mt-1">
+      Days: {data.days}, points: {data.num_points}
+    </p>
+  </div>
 
-              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
-                <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-                  Buy and hold return
-                </p>
-                <p className="text-2xl font-semibold text-emerald-400">
-                  {data.buy_and_hold_return_pct}%
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  From first close to last close
-                </p>
-              </div>
+  <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+    <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
+      Buy and hold return
+    </p>
+    <p className="text-2xl font-semibold text-emerald-400">
+      {data.buy_and_hold_return_pct}%
+    </p>
+    <p className="text-xs text-slate-400 mt-1">
+      From first close to last close
+    </p>
+  </div>
 
-              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
-                <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-                  SMA strategies
-                </p>
-                <p className="text-sm text-slate-200">
-                  SMA {data.window}d:{" "}
-                  <span className="font-semibold text-emerald-300">
-                    {data.sma_strategy_return_pct}%
-                  </span>
-                </p>
-                <p className="text-sm text-slate-200">
-                  SMA {data.alt_window}d:{" "}
-                  <span className="font-semibold text-emerald-200">
-                    {data.alt_sma_strategy_return_pct}%
-                  </span>
-                </p>
+  <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+    <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
+      SMA strategies
+    </p>
+    <p className="text-sm text-slate-200">
+      SMA {data.window}d:{" "}
+      <span className="font-semibold text-emerald-300">
+        {data.sma_strategy_return_pct}%
+      </span>
+    </p>
+    <p className="text-sm text-slate-200">
+      SMA {data.alt_window}d:{" "}
+      <span className="font-semibold text-emerald-200">
+        {data.alt_sma_strategy_return_pct}%
+      </span>
+    </p>
 
-                {best && (
-                  <p className="text-xs text-slate-300 mt-1">
-                    Best performer:{" "}
-                    <span className="font-semibold text-emerald-300">
-                      {best.label} ({best.value}%)
-                    </span>
-                  </p>
-                )}
+    {best && (
+      <p className="text-xs text-slate-300 mt-1">
+        Best performer:{" "}
+        <span className="font-semibold text-emerald-300">
+          {best.label} ({best.value}%)
+        </span>
+      </p>
+    )}
 
-                <p className="text-xs text-slate-400 mt-1">
-                  Both based on simple crossover logic.
-                </p>
-              </div>
-            </section>
+    <p className="text-xs text-slate-400 mt-1">
+      Both based on simple crossover logic.
+    </p>
+  </div>
+
+  {/* New: Risk & stats card */}
+  <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+    <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
+      Risk &amp; stats
+    </p>
+    <p className="text-sm text-slate-200">
+      Max drawdown:{" "}
+      <span className="font-semibold text-rose-300">
+        {data.max_drawdown_pct}%
+      </span>
+    </p>
+    <p className="text-sm text-slate-200">
+      Volatility:{" "}
+      <span className="font-semibold text-sky-300">
+        {data.volatility_pct}%
+      </span>
+    </p>
+    <p className="text-sm text-slate-200">
+      Sharpe-like:{" "}
+      <span className="font-semibold text-amber-300">
+        {data.sharpe_like}
+      </span>
+    </p>
+    <p className="text-xs text-slate-400 mt-1">
+      Simple stats from the SMA equity curve.
+    </p>
+  </div>
+</section>
 
             {/* Equity curve chart */}
             {data.equity_curve && data.equity_curve.length > 0 && (
