@@ -13,7 +13,7 @@ import {
 
 type DemoBacktest = {
   symbol: string;
-  window: number;
+  window: number; // backend SMA window
   alt_window: number;
   days: number;
   buy_and_hold_return_pct: number;
@@ -25,6 +25,15 @@ type DemoBacktest = {
 };
 
 type HealthStatus = "checking" | "online" | "offline";
+
+type CustomPreset = {
+  id: string;
+  name: string;
+  symbol: string;
+  window: number;
+  altWindow: number;
+  days: number;
+};
 
 // Frontend validation limits (match or tighten backend guards)
 const MIN_WINDOW = 1;
@@ -48,9 +57,14 @@ function getBestPerformer(data: DemoBacktest) {
   );
 }
 
+function savePresetsToStorage(next: CustomPreset[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem("vantageLitePresets", JSON.stringify(next));
+}
+
 export default function Home() {
   const [symbol, setSymbol] = useState("DUMMY");
-  const [window, setWindow] = useState(5);
+  const [smaWindow, setSmaWindow] = useState(5);
   const [altWindow, setAltWindow] = useState(10);
   const [days, setDays] = useState(30);
 
@@ -59,6 +73,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
 
   const [health, setHealth] = useState<HealthStatus>("checking");
+  const [customPresets, setCustomPresets] = useState<CustomPreset[]>([]);
+  const [presetError, setPresetError] = useState<string | null>(null);
 
   const best = data ? getBestPerformer(data) : null;
 
@@ -82,9 +98,10 @@ export default function Home() {
     days?: number;
   }) {
     const rawSymbol = params?.symbol ?? symbol;
-    const s = rawSymbol.trim() === "" ? "DUMMY" : rawSymbol.trim().toUpperCase();
+    const s =
+      rawSymbol.trim() === "" ? "DUMMY" : rawSymbol.trim().toUpperCase();
 
-    const rawWindow = params?.window ?? window;
+    const rawWindow = params?.window ?? smaWindow;
     const rawAltWindow = params?.altWindow ?? altWindow;
     const rawDays = params?.days ?? days;
 
@@ -93,7 +110,7 @@ export default function Home() {
     const d = clamp(rawDays, MIN_DAYS, MAX_DAYS);
 
     // keep local state in sync with clamped values
-    setWindow(w);
+    setSmaWindow(w);
     setAltWindow(aw);
     setDays(d);
     setSymbol(s);
@@ -140,16 +157,114 @@ export default function Home() {
     }
   }
 
-  // On first render: check backend health and load default backtest
+  // On first render: check backend health, load default backtest, load presets
   useEffect(() => {
     checkHealth();
     fetchBacktest();
+
+    if (typeof window !== "undefined") {
+      try {
+        const stored = window.localStorage.getItem("vantageLitePresets");
+        if (stored) {
+          const parsed = JSON.parse(stored) as CustomPreset[];
+          setCustomPresets(parsed);
+        }
+      } catch {
+        // ignore parse errors
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     fetchBacktest();
+  }
+
+  // Built-in presets
+  function handlePreset(presetSymbol: string) {
+    const s = presetSymbol.toUpperCase();
+    setSymbol(s);
+    fetchBacktest({ symbol: s });
+  }
+
+  // Reset to defaults
+  function handleReset() {
+    const s = "DUMMY";
+    const w = 5;
+    const aw = 10;
+    const d = 30;
+
+    setSymbol(s);
+    setSmaWindow(w);
+    setAltWindow(aw);
+    setDays(d);
+    fetchBacktest({ symbol: s, window: w, altWindow: aw, days: d });
+  }
+
+  function handleSavePreset() {
+    setPresetError(null);
+  
+    if (customPresets.length >= 4) {
+      setPresetError(
+        "You can only save up to 4 custom presets. Delete one to add another."
+      );
+      return;
+    }
+  
+    // Clean + validate the current symbol
+    const cleanSymbol = symbol.trim().toUpperCase();
+  
+    if (!cleanSymbol || cleanSymbol === "DUMMY") {
+      setPresetError(
+        "Set a real symbol (e.g. AAPL) in the Symbol box before saving a preset."
+      );
+      return;
+    }
+  
+    const defaultName = cleanSymbol;
+    const name =
+      typeof window !== "undefined"
+        ? window.prompt("Preset name", defaultName)
+        : null;
+  
+    if (!name) return;
+  
+    const newPreset: CustomPreset = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      name: name.trim(),
+      symbol: cleanSymbol,        // <-- always a real ticker now
+      window: smaWindow,
+      altWindow,
+      days,
+    };
+  
+    const next = [...customPresets, newPreset];
+    setCustomPresets(next);
+    savePresetsToStorage(next);
+  }
+
+  function handleApplyCustomPreset(preset: CustomPreset) {
+    setPresetError(null);
+
+    setSymbol(preset.symbol);
+    setSmaWindow(preset.window);
+    setAltWindow(preset.altWindow);
+    setDays(preset.days);
+
+    fetchBacktest({
+      symbol: preset.symbol,
+      window: preset.window,
+      altWindow: preset.altWindow,
+      days: preset.days,
+    });
+  }
+
+  function handleDeletePreset(id: string) {
+    setPresetError(null);
+    const next = customPresets.filter((p) => p.id !== id);
+    setCustomPresets(next);
+    savePresetsToStorage(next);
   }
 
   function renderHealthBadge() {
@@ -214,6 +329,7 @@ export default function Home() {
                   Leave blank to use DUMMY.
                 </p>
               </div>
+
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-300">
                   SMA window (days)
@@ -222,11 +338,11 @@ export default function Home() {
                   type="number"
                   min={MIN_WINDOW}
                   max={MAX_WINDOW}
-                  value={window}
+                  value={smaWindow}
                   onChange={(e) => {
                     const value = Number(e.target.value);
                     if (Number.isNaN(value)) return;
-                    setWindow(clamp(value, MIN_WINDOW, MAX_WINDOW));
+                    setSmaWindow(clamp(value, MIN_WINDOW, MAX_WINDOW));
                   }}
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 outline-none focus:border-sky-500"
                 />
@@ -234,6 +350,7 @@ export default function Home() {
                   {MIN_WINDOW}-{MAX_WINDOW} days.
                 </p>
               </div>
+
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-300">
                   Alt SMA window (days)
@@ -254,6 +371,7 @@ export default function Home() {
                   {MIN_WINDOW}-{MAX_WINDOW} days.
                 </p>
               </div>
+
               <div className="space-y-1">
                 <label className="text-xs font-medium text-slate-300">
                   Number of days
@@ -273,6 +391,72 @@ export default function Home() {
                 <p className="text-[11px] text-slate-500">
                   {MIN_DAYS}-{MAX_DAYS} days.
                 </p>
+              </div>
+
+              {/* Quick presets (built-in + custom) */}
+              <div className="space-y-1 sm:col-span-4">
+                <p className="text-[11px] text-slate-500">Quick presets</p>
+                <div className="mt-1 flex flex-wrap gap-2">
+                  {/* Built-in presets */}
+                  {["AAPL", "SPY", "QQQ"].map((sym) => (
+                    <button
+                      key={sym}
+                      type="button"
+                      onClick={() => handlePreset(sym)}
+                      className="rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-100 hover:bg-slate-800"
+                      disabled={loading || health === "offline"}
+                    >
+                      {sym}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={handleReset}
+                    className="rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                    disabled={loading || health === "offline"}
+                  >
+                    Reset
+                  </button>
+
+                  {/* Custom presets */}
+                  {customPresets.map((preset) => (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => handleApplyCustomPreset(preset)}
+                      className="flex items-center gap-1 rounded-full border border-slate-700 px-2.5 py-1 text-xs text-slate-100 hover:bg-slate-800"
+                      disabled={loading || health === "offline"}
+                    >
+                      {preset.name}
+                      <span
+                        className="text-slate-500 hover:text-red-400"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePreset(preset.id);
+                        }}
+                      >
+                        ×
+                      </span>
+                    </button>
+                  ))}
+
+                  {/* Save current as preset */}
+                  <button
+                    type="button"
+                    onClick={handleSavePreset}
+                    className="rounded-full border border-sky-500 px-2.5 py-1 text-xs text-sky-300 hover:bg-sky-900"
+                    disabled={loading || health === "offline"}
+                  >
+                    Save preset
+                  </button>
+                </div>
+
+                {presetError && (
+                  <p className="text-[11px] text-amber-400 mt-1">
+                    {presetError}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -419,6 +603,7 @@ export default function Home() {
               </section>
             )}
 
+            {/* Price series table */}
             <section className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs uppercase tracking-wide text-slate-400">
