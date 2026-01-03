@@ -2,6 +2,13 @@
 
 Vantage Lite is a small full-stack trading playground that shows how a React/Next.js frontend can talk to a FastAPI backend to run simple backtests on **real market data**.
 
+It uses:
+
+- A synthetic **dummy price series** for quick, deterministic demos
+- Live **historical prices from Yahoo Finance** (via `yfinance`) when you enter real tickers like `AAPL`, `SPY`, or `QQQ`
+
+The goal is to keep the math and code easy to follow while still looking and feeling like a real tool that you could put in a portfolio.
+
 It started as a lightweight clone of my older “Vantage Trades” idea, but rebuilt with a modern, clean stack and a tighter scope:  
 one page, a few strategies, real prices, and clear performance / risk metrics.
 
@@ -165,3 +172,19 @@ vantage-lite/
   .python-version     # pyenv version pin
   .gitignore
   README.md           # this file
+
+  ---
+
+## Getting started (local dev)
+
+### Prerequisites
+
+- Python 3.11 (via `pyenv` or a system install)
+- Node.js + npm
+- Git
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/BigBallBaller/vantage-lite.git
+cd vantage-lite
