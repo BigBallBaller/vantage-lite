@@ -29,8 +29,8 @@ type DemoBacktest = {
 };
 
 type BacktestSummary = {
-  id: number;          // unique per run
-  timestamp: string;   // ISO string
+  id: number;
+  timestamp: string;
   symbol: string;
   window: number;
   altWindow: number;
@@ -93,9 +93,9 @@ export default function Home() {
   const [customPresets, setCustomPresets] = useState<CustomPreset[]>([]);
   const [presetError, setPresetError] = useState<string | null>(null);
 
-  const best = data ? getBestPerformer(data) : null;
-
   const [history, setHistory] = useState<BacktestSummary[]>([]);
+
+  const best = data ? getBestPerformer(data) : null;
 
   async function checkHealth() {
     try {
@@ -117,28 +117,30 @@ export default function Home() {
     days?: number;
   }) {
     const rawSymbol = params?.symbol ?? symbol;
-    const s =
-      rawSymbol.trim() === "" ? "DUMMY" : rawSymbol.trim().toUpperCase();
-
+    const s = rawSymbol.trim() === "" ? "DUMMY" : rawSymbol.trim().toUpperCase();
+  
     const rawWindow = params?.window ?? smaWindow;
     const rawAltWindow = params?.altWindow ?? altWindow;
     const rawDays = params?.days ?? days;
-
+  
     const w = clamp(rawWindow, MIN_WINDOW, MAX_WINDOW);
     const aw = clamp(rawAltWindow, MIN_WINDOW, MAX_WINDOW);
     const d = clamp(rawDays, MIN_DAYS, MAX_DAYS);
-
-    // keep local state in sync with clamped values
+  
     setSmaWindow(w);
     setAltWindow(aw);
     setDays(d);
     setSymbol(s);
+
+    // Real data for real tickers, dummy for the special DUMMY symbol
+    const useReal = s !== "DUMMY";
 
     const query = new URLSearchParams({
       symbol: s,
       window: String(w),
       alt_window: String(aw),
       days: String(d),
+      use_real: String(useReal),
     });
 
     try {
@@ -154,7 +156,7 @@ export default function Home() {
       const json = (await res.json()) as DemoBacktest;
       setData(json);
 
-      // Record a short summary of this run in local history (up to 5 entries)
+      // Update local history (latest first, keep last 10)
       const summary: BacktestSummary = {
         id: Date.now(),
         timestamp: new Date().toISOString(),
@@ -168,10 +170,7 @@ export default function Home() {
         sharpeLike: json.sharpe_like,
       };
 
-      setHistory((prev) => {
-        const next = [summary, ...prev];
-        return next.slice(0, 5); // keep only last 5 runs
-      });
+      setHistory((prev) => [summary, ...prev].slice(0, 10));
     } catch (err: any) {
       let message = "Unknown error";
 
@@ -180,7 +179,7 @@ export default function Home() {
         rawMessage.includes("Failed to fetch") ||
         rawMessage.includes("NetworkError")
       ) {
-        message = `Could not reach backend at ${api.baseUrl}. Please make sure it is running.`;
+        message = `Could not reach backend at ${api.backtestDemo}. Please make sure it is running.`;
       } else if (rawMessage) {
         message = rawMessage;
       }
@@ -190,30 +189,6 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }
-
-  // On first render: check backend health, load default backtest, load presets
-  useEffect(() => {
-    checkHealth();
-    fetchBacktest();
-
-    if (typeof window !== "undefined") {
-      try {
-        const stored = window.localStorage.getItem("vantageLitePresets");
-        if (stored) {
-          const parsed = JSON.parse(stored) as CustomPreset[];
-          setCustomPresets(parsed);
-        }
-      } catch {
-        // ignore parse errors
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    fetchBacktest();
   }
 
   // Built-in presets
@@ -239,41 +214,40 @@ export default function Home() {
 
   function handleSavePreset() {
     setPresetError(null);
-  
+
     if (customPresets.length >= 4) {
       setPresetError(
         "You can only save up to 4 custom presets. Delete one to add another."
       );
       return;
     }
-  
-    // Clean + validate the current symbol
+
     const cleanSymbol = symbol.trim().toUpperCase();
-  
+
     if (!cleanSymbol || cleanSymbol === "DUMMY") {
       setPresetError(
-        "Set a real symbol (e.g. AAPL) in the Symbol box before saving a preset."
+        "Set a real symbol (for example AAPL) in the Symbol box before saving a preset."
       );
       return;
     }
-  
+
     const defaultName = cleanSymbol;
     const name =
       typeof window !== "undefined"
         ? window.prompt("Preset name", defaultName)
         : null;
-  
+
     if (!name) return;
-  
+
     const newPreset: CustomPreset = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       name: name.trim(),
-      symbol: cleanSymbol,        // <-- always a real ticker now
+      symbol: cleanSymbol,
       window: smaWindow,
       altWindow,
       days,
     };
-  
+
     const next = [...customPresets, newPreset];
     setCustomPresets(next);
     savePresetsToStorage(next);
@@ -302,6 +276,11 @@ export default function Home() {
     savePresetsToStorage(next);
   }
 
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    fetchBacktest();
+  }
+
   function renderHealthBadge() {
     let text = "Checking…";
     let circleClass = "bg-yellow-400";
@@ -321,6 +300,26 @@ export default function Home() {
       </div>
     );
   }
+
+  // On first render: check backend, load presets, run default backtest
+  useEffect(() => {
+    checkHealth();
+
+    try {
+      if (typeof window !== "undefined") {
+        const raw = window.localStorage.getItem("vantageLitePresets");
+        if (raw) {
+          const parsed = JSON.parse(raw) as CustomPreset[];
+          setCustomPresets(parsed);
+        }
+      }
+    } catch {
+      // ignore corrupt localStorage
+    }
+
+    fetchBacktest();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-4">
@@ -528,90 +527,91 @@ export default function Home() {
         {/* Results */}
         {data && (
           <>
+            {/* Summary cards */}
             <section className="grid gap-4 sm:grid-cols-4">
-  <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
-    <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-      Symbol
-    </p>
-    <p className="text-lg font-semibold text-sky-300">
-      {data.symbol}
-    </p>
-    <p className="text-xs text-slate-400 mt-1">
-      Days: {data.days}, points: {data.num_points}
-    </p>
-  </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
+                  Symbol
+                </p>
+                <p className="text-lg font-semibold text-sky-300">
+                  {data.symbol}
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Days: {data.days}, points: {data.num_points}
+                </p>
+              </div>
 
-  <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
-    <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-      Buy and hold return
-    </p>
-    <p className="text-2xl font-semibold text-emerald-400">
-      {data.buy_and_hold_return_pct}%
-    </p>
-    <p className="text-xs text-slate-400 mt-1">
-      From first close to last close
-    </p>
-  </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
+                  Buy and hold return
+                </p>
+                <p className="text-2xl font-semibold text-emerald-400">
+                  {data.buy_and_hold_return_pct}%
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  From first close to last close
+                </p>
+              </div>
 
-  <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
-    <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-      SMA strategies
-    </p>
-    <p className="text-sm text-slate-200">
-      SMA {data.window}d:{" "}
-      <span className="font-semibold text-emerald-300">
-        {data.sma_strategy_return_pct}%
-      </span>
-    </p>
-    <p className="text-sm text-slate-200">
-      SMA {data.alt_window}d:{" "}
-      <span className="font-semibold text-emerald-200">
-        {data.alt_sma_strategy_return_pct}%
-      </span>
-    </p>
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
+                  SMA strategies
+                </p>
+                <p className="text-sm text-slate-200">
+                  SMA {data.window}d:{" "}
+                  <span className="font-semibold text-emerald-300">
+                    {data.sma_strategy_return_pct}%
+                  </span>
+                </p>
+                <p className="text-sm text-slate-200">
+                  SMA {data.alt_window}d:{" "}
+                  <span className="font-semibold text-emerald-200">
+                    {data.alt_sma_strategy_return_pct}%
+                  </span>
+                </p>
 
-    {best && (
-      <p className="text-xs text-slate-300 mt-1">
-        Best performer:{" "}
-        <span className="font-semibold text-emerald-300">
-          {best.label} ({best.value}%)
-        </span>
-      </p>
-    )}
+                {best && (
+                  <p className="text-xs text-slate-300 mt-1">
+                    Best performer:{" "}
+                    <span className="font-semibold text-emerald-300">
+                      {best.label} ({best.value}%)
+                    </span>
+                  </p>
+                )}
 
-    <p className="text-xs text-slate-400 mt-1">
-      Both based on simple crossover logic.
-    </p>
-  </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Both based on simple crossover logic.
+                </p>
+              </div>
 
-  {/* New: Risk & stats card */}
-  <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
-    <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
-      Risk &amp; stats
-    </p>
-    <p className="text-sm text-slate-200">
-      Max drawdown:{" "}
-      <span className="font-semibold text-rose-300">
-        {data.max_drawdown_pct}%
-      </span>
-    </p>
-    <p className="text-sm text-slate-200">
-      Volatility:{" "}
-      <span className="font-semibold text-sky-300">
-        {data.volatility_pct}%
-      </span>
-    </p>
-    <p className="text-sm text-slate-200">
-      Sharpe-like:{" "}
-      <span className="font-semibold text-amber-300">
-        {data.sharpe_like}
-      </span>
-    </p>
-    <p className="text-xs text-slate-400 mt-1">
-      Simple stats from the SMA equity curve.
-    </p>
-  </div>
-</section>
+              {/* Risk & stats card */}
+              <div className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
+                <p className="text-xs uppercase tracking-wide text-slate-400 mb-1">
+                  Risk &amp; stats
+                </p>
+                <p className="text-sm text-slate-200">
+                  Max drawdown:{" "}
+                  <span className="font-semibold text-rose-300">
+                    {data.max_drawdown_pct}%
+                  </span>
+                </p>
+                <p className="text-sm text-slate-200">
+                  Volatility:{" "}
+                  <span className="font-semibold text-sky-300">
+                    {data.volatility_pct}%
+                  </span>
+                </p>
+                <p className="text-sm text-slate-200">
+                  Sharpe-like:{" "}
+                  <span className="font-semibold text-amber-300">
+                    {data.sharpe_like}
+                  </span>
+                </p>
+                <p className="text-xs text-slate-400 mt-1">
+                  Simple stats from the SMA equity curve.
+                </p>
+              </div>
+            </section>
 
             {/* Equity curve chart */}
             {data.equity_curve && data.equity_curve.length > 0 && (
@@ -666,8 +666,8 @@ export default function Home() {
               </section>
             )}
 
-              {/* Recent backtests (local history) */}
-              {history.length > 0 && (
+            {/* Recent backtests (local history) */}
+            {history.length > 0 && (
               <section className="rounded-xl border border-slate-800 bg-slate-900 px-4 py-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs uppercase tracking-wide text-slate-400">
