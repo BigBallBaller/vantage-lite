@@ -8,15 +8,17 @@ from .backtest import run_dummy_backtest
 # This is the FastAPI app uvicorn expects as "app"
 app = FastAPI(title="Vantage Lite Backend")
 
-# Allow the Next.js dev server to call the API
+# Allowed frontend origins (local dev + deployed)
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    # TODO: update this once we get Vercel URL
+    "https://vantage-lite.vercel.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        #  add deployed frontend origin here, e.g.:
-        # "https://vantage-lite.vercel.app",
-    ],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

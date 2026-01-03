@@ -1,60 +1,144 @@
 # Vantage Lite
 
-Vantage Lite is a small full-stack trading playground that shows how a React/Next.js frontend can talk to a FastAPI backend to run simple backtests.
+Vantage Lite is a small full-stack trading playground that shows how a React/Next.js frontend can talk to a FastAPI backend to run simple backtests on **real market data**.
 
-It uses a deterministic dummy price series (instead of live market data) to keep the logic easy to reason about while still exercising the full request → backtest → visualization flow.
+It started as a lightweight clone of my older “Vantage Trades” idea, but rebuilt with a modern, clean stack and a tighter scope:  
+one page, a few strategies, real prices, and clear performance / risk metrics.
+
+---
+
+## Overview
+
+The app lets you:
+
+- Pick a **ticker** (e.g. AAPL, SPY, QQQ, or a custom symbol)
+- Choose **SMA windows** and a **lookback period**
+- Run a backtest that:
+  - pulls real daily prices (via `yfinance`) for non-`DUMMY` symbols
+  - or uses a deterministic dummy series for the special `DUMMY` symbol
+- See:
+  - Buy & hold performance
+  - Two SMA strategy returns
+  - Equity curve
+  - Basic risk metrics (drawdown, volatility, Sharpe-like)
+
+All of this is wired end-to-end: frontend → FastAPI → backtest logic → JSON → charts & tables.
 
 ---
 
 ## Tech stack
 
-- **Frontend**
-  - Next.js (App Router, TypeScript)
-  - React + client components
-  - Tailwind CSS
-  - Recharts (equity curve chart)
+**Frontend**
 
-- **Backend**
-  - FastAPI
-  - Uvicorn
-  - Pydantic
+- [Next.js](https://nextjs.org/) (App Router, TypeScript)
+- React client components
+- Tailwind CSS
+- [Recharts](https://recharts.org/) for the equity curve chart
+- LocalStorage for user-saved presets
 
-- **Tooling**
-  - Python 3.11 (managed with `pyenv` + `venv`)
-  - Node.js / npm
-  - Git + GitHub
+**Backend**
+
+- FastAPI
+- Uvicorn
+- Pydantic
+- `yfinance` for real daily OHLCV data
+
+**Tooling**
+
+- Python 3.11 (`pyenv` + `venv`)
+- Node.js + npm
+- Git + GitHub
 
 ---
 
 ## Features
 
-- 🔁 **Dummy backtest endpoint**  
-  FastAPI backend exposes `/backtest/demo` which:
-  - generates a synthetic price series
-  - computes:
-    - buy & hold return
-    - SMA strategy return (window 1–100 days)
-    - alternate SMA strategy return (window 1–100 days)
-  - returns an equity curve for the main SMA strategy
+### 1. Backtest endpoint
 
-- 📊 **Interactive frontend controls**
-  - Symbol input (uppercased, with a `DUMMY` fallback)
-  - SMA window and alt window (with client-side clamping)
-  - Number of days (5–365, clamped)
+The backend exposes a single main endpoint:
 
-- ⚡ **Quick presets & reset**
-  - One-click presets for **AAPL**, **SPY**, **QQQ**
-  - “Reset” button to jump back to `DUMMY`, 5d / 10d SMAs, 30 days
+`GET /backtest/demo`
 
-- 📈 **Visualizations**
-  - Equity curve chart (strategy equity starting from 1.0)
-  - Price series table with dates and closes
+Query parameters:
 
-- ✅ **Health & validation**
-  - Backend health check badge (`/health`)
-  - Disabled run button + inline hint when backend is offline
-  - Friendly error messages if the backend cannot be reached
-  - Client-side clamping on all numeric inputs
+- `symbol`: ticker symbol (e.g. `AAPL`, `SPY`, `QQQ`, or `DUMMY`)
+- `window`: main SMA window (1–100)
+- `alt_window`: alternate SMA window (1–100)
+- `days`: lookback window (5–365 days)
+- `use_real`: boolean; if `true` and symbol ≠ `DUMMY`, fetch real prices via `yfinance`
+
+The endpoint returns a JSON payload with:
+
+- `symbol`
+- `window`, `alt_window`, `days`
+- `buy_and_hold_return_pct`
+- `sma_strategy_return_pct`
+- `alt_sma_strategy_return_pct`
+- `num_points`
+- `prices`: array of `{ date, close }`
+- `equity_curve`: array of `{ step, equity }`
+- `max_drawdown_pct`
+- `volatility_pct`
+- `sharpe_like`
+
+### 2. Strategies & risk metrics
+
+The backtester currently supports:
+
+- **Buy & hold**  
+  - Return from first close to last close
+
+- **Main SMA strategy**  
+  - Simple SMA crossover / regime logic using the `window` parameter  
+  - Full equity curve is returned
+
+- **Alternate SMA strategy**  
+  - Same idea, with `alt_window`  
+  - Only final return is reported
+
+**Risk metrics** are computed from the main SMA equity curve:
+
+- **Max drawdown** (`max_drawdown_pct`)  
+  Worst peak-to-trough drop, in percent.
+
+- **Volatility** (`volatility_pct`)  
+  Standard deviation of daily returns (SMA equity), in percent.
+
+- **Sharpe-like** (`sharpe_like`)  
+  Mean daily return / std dev of daily returns (not annualized).  
+  It’s intentionally labeled “Sharpe-like” because it’s a simple ratio, not a fully risk-free-adjusted Sharpe.
+
+### 3. Frontend experience
+
+The main page (`frontend/src/app/page.tsx`) includes:
+
+- Inputs for:
+  - Symbol
+  - SMA window
+  - Alt SMA window
+  - Number of days
+- **Built-in presets**: AAPL, SPY, QQQ
+- **Custom presets**:
+  - Save up to 4 custom presets (stored in `localStorage`)
+  - Each preset remembers symbol + windows + days
+  - Inline delete (“×”) to remove a preset
+- **Reset button**:
+  - Resets inputs back to `DUMMY`, 5d / 10d SMAs, 30 days
+
+- **Health badge**:
+  - Calls `/health`
+  - Shows “Backend: Online / Offline”
+  - Disables the run button when backend is offline
+
+- **Results section**:
+  - Summary cards:
+    - Symbol / days / points
+    - Buy & hold return
+    - SMA returns (main & alt) + “Best performer” label
+    - Risk & stats (max drawdown, volatility, Sharpe-like)
+  - Equity curve chart (Recharts)
+  - Recent backtests table (local history, last 10 runs)
+  - Price series table with date / close
 
 ---
 
@@ -64,19 +148,20 @@ It uses a deterministic dummy price series (instead of live market data) to keep
 vantage-lite/
   backend/
     app/
-      main.py         # FastAPI app + routing
-      backtest.py     # dummy price generator + SMA logic
+      main.py         # FastAPI app, routing, /backtest/demo and /health
+      backtest.py     # dummy prices, yfinance fetch, SMA logic, risk metrics
     requirements.txt  # backend Python deps
 
   frontend/
     package.json      # Next.js app (App Router, TS, Tailwind)
     src/
       app/
-        page.tsx      # main UI: form, chart, table
+        config.ts     # API base + endpoints
+        page.tsx      # main UI: form, presets, history, chart, tables
 
   docs/
     notes.md          # scratch notes / ideas
 
   .python-version     # pyenv version pin
   .gitignore
-  README.md           # (this file)
+  README.md           # this file
