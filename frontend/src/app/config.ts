@@ -1,10 +1,9 @@
-// frontend/src/config.ts
+// frontend/src/app/config.ts
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
 export const api = {
-  baseUrl: API_BASE_URL,
-  health: `${API_BASE_URL}/health`,
-  backtestDemo: `${API_BASE_URL}/backtest/demo`,
+  backtestDemo: `${API_BASE}/backtest/demo`,
+  health: `${API_BASE}/health`,
 };
