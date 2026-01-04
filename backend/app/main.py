@@ -14,6 +14,7 @@ origins = [
     "http://127.0.0.1:3000",
     # TODO: update this once we get Vercel URL
     "https://vantage-lite.vercel.app",
+    "https://vantage-lite-backend.vercel.app",
 ]
 
 app.add_middleware(
